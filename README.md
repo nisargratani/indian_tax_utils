@@ -22,7 +22,7 @@ Add the following to your `pubspec.yaml` file:
 
 ```yaml
 dependencies:
-  indian_tax_utils: ^1.0.0
+  indian_tax_utils: ^0.0.1
 ```
 
 ## Usage
