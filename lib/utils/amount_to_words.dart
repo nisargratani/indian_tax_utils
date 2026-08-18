@@ -1,4 +1,10 @@
+/// Utility for converting amounts to words.
+library amount_to_words;
+
+/// A utility class to convert numerical amounts to Indian English words.
 class AmountToWords {
+  /// Default constructor.
+  AmountToWords();
   static const List<String> _units = [
     "", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine",
     "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen",

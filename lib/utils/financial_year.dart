@@ -1,4 +1,11 @@
+/// Utility library for financial year helper.
+library financial_year;
+
+/// A utility class for working with financial years.
 class FinancialYear {
+  /// Default constructor.
+  FinancialYear();
+
   /// Gets the financial year string for a given date (e.g., "2023-24")
   static String get(DateTime date) {
     int startYear;
