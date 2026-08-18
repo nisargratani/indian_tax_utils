@@ -1,6 +1,6 @@
 name: indian_tax_utils
 description: Tax calculation utilities for Indian ERP and billing apps including GST, TDS, invoice totals, rounding and discount helpers.
-version: 0.0.1
+version: 0.0.2
 repository: https://github.com/nisargratani/indian_tax_utils
 
 environment:

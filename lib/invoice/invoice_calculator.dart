@@ -1,7 +1,15 @@
+/// Utility library for invoice calculation.
+library invoice_calculator;
+
 import '../models/invoice_result.dart';
 import '../rounding/rounding_helper.dart';
 
+/// A utility class for calculating invoice totals.
 class InvoiceCalculator {
+  /// Default constructor.
+  InvoiceCalculator();
+
+  /// Calculates invoice totals including tax and rounding.
   static InvoiceResult calculate({
     required double subtotal,
     double discount = 0,

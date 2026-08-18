@@ -1,4 +1,10 @@
+/// Utility for currency formatting.
+library currency_helper;
+
+/// A helper class to format double amounts into Indian currency strings.
 class CurrencyHelper {
+  /// Default constructor.
+  CurrencyHelper();
   /// Formats a double value into Indian Currency format (₹ #,##,###.##)
   static String format(double amount, {bool symbol = true, int decimals = 2}) {
     String sign = amount < 0 ? "-" : "";

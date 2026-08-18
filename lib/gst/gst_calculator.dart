@@ -1,6 +1,14 @@
+/// Utility library for GST calculation.
+library gst_calculator;
+
 import '../models/gst_result.dart';
 
+/// A utility class for calculating GST components.
 class GstCalculator {
+  /// Default constructor.
+  GstCalculator();
+
+  /// Calculates CGST, SGST, IGST and Total Tax for a given amount and rate.
   static GstResult calculate({
     required double amount,
     required double rate,

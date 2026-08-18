@@ -1,4 +1,11 @@
+/// Utility library for tax validators.
+library validators;
+
+/// A utility class for validating tax related numbers.
 class TaxValidators {
+  /// Default constructor.
+  TaxValidators();
+
   /// Validates Indian PAN card number
   static bool isValidPan(String pan) {
     final panRegex = RegExp(r'^[A-Z]{5}[0-9]{4}[A-Z]{1}$');
