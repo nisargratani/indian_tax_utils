@@ -1,6 +1,6 @@
-## 0.1.0
+## 0.0.3
 
-This release contains **breaking changes**. See "Migrating from 0.0.x" in
+This release contains **breaking changes**. See "Migrating from 0.0.2" in
 the README for the short version.
 
 ### Breaking changes

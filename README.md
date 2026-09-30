@@ -34,7 +34,7 @@ Or add it to `pubspec.yaml` yourself:
 
 ```yaml
 dependencies:
-  indian_tax_utils: ^0.1.0
+  indian_tax_utils: ^0.0.3
 ```
 
 ## Quick start
@@ -233,9 +233,9 @@ try {
 Negative amounts are allowed (for example on credit notes), as long as any
 discount is zero.
 
-## Migrating from 0.0.x
+## Migrating from 0.0.2
 
-0.1.0 contains breaking changes; see the [changelog](CHANGELOG.md) for the
+0.0.3 contains breaking changes; see the [changelog](CHANGELOG.md) for the
 full list. The ones most likely to need code changes:
 
 - Import only `package:indian_tax_utils/indian_tax_utils.dart`. Imports
