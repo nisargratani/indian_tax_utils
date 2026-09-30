@@ -1,10 +1,19 @@
 name: indian_tax_utils
 description: Tax calculation utilities for Indian ERP and billing apps including GST, TDS, invoice totals, rounding and discount helpers.
-version: 0.0.2
+version: 0.1.0
 repository: https://github.com/nisargratani/indian_tax_utils
+issue_tracker: https://github.com/nisargratani/indian_tax_utils/issues
+topics:
+  - gst
+  - tax
+  - india
+  - invoice
+  - finance
 
 environment:
   sdk: ">=3.0.0 <4.0.0"
 
 dev_dependencies:
+  # The range lets each SDK pick the newest lints it supports (3.x on Dart 3.0).
+  lints: ">=3.0.0 <7.0.0"
   test: ^1.25.0
