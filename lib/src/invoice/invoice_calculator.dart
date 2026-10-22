@@ -21,7 +21,9 @@ abstract final class InvoiceCalculator {
   /// ```
   ///
   /// Throws an [ArgumentError] if any value is not finite, if [gstRate] is
-  /// negative, or if [discount] is negative or greater than [subtotal].
+  /// negative, if [discount] is negative or greater than [subtotal], or if
+  /// the result is not finite (a [subtotal] so large that the calculation
+  /// overflows).
   static InvoiceResult calculate({
     required double subtotal,
     double discount = 0,
@@ -31,15 +33,18 @@ abstract final class InvoiceCalculator {
     checkDiscount(discount, subtotal, 'discount');
     checkRate(gstRate, 'gstRate');
 
-    final taxable = subtotal - discount;
-    final tax = taxable * gstRate / 100;
+    // Adding 0.0 turns -0.0 (e.g. -100 at 0%) into 0.0.
+    final taxable = subtotal - discount + 0.0;
+    final tax = taxable * gstRate / 100 + 0.0;
 
     final total = taxable + tax;
+    checkResult(tax, subtotal, 'subtotal');
+    checkResult(total, subtotal, 'subtotal');
     final rounded = RoundingHelper.roundToNearest(total);
 
     return InvoiceResult(
-      subtotal: subtotal,
-      discount: discount,
+      subtotal: subtotal + 0.0,
+      discount: discount + 0.0,
       tax: tax,
       total: total,
       roundedTotal: rounded,
@@ -65,8 +70,9 @@ abstract final class InvoiceCalculator {
   /// `RoundingHelper.roundTo` first if your invoices round tax per line.
   ///
   /// Throws an [ArgumentError] if any item has a non-finite quantity or unit
-  /// price, a negative or non-finite tax rate, or a discount that is negative
-  /// or greater than the item's subtotal.
+  /// price, a negative or non-finite tax rate, a discount that is negative
+  /// or greater than the item's subtotal, or values so large that the item's
+  /// or the invoice's totals are not finite.
   static InvoiceResult fromItems(List<InvoiceItem> items) {
     var subtotal = 0.0;
     var discount = 0.0;
@@ -77,7 +83,9 @@ abstract final class InvoiceCalculator {
       checkFinite(item.quantity, 'items[$i].quantity');
       checkFinite(item.unitPrice, 'items[$i].unitPrice');
       checkRate(item.taxRate, 'items[$i].taxRate');
+      checkResult(item.subtotal, item.quantity, 'items[$i].quantity');
       checkDiscount(item.discount, item.subtotal, 'items[$i].discount');
+      checkResult(item.total, item.quantity, 'items[$i].quantity');
 
       subtotal += item.subtotal;
       discount += item.discount;
@@ -85,6 +93,9 @@ abstract final class InvoiceCalculator {
     }
 
     final total = subtotal - discount + tax;
+    if (!subtotal.isFinite || !tax.isFinite || !total.isFinite) {
+      throw ArgumentError('Result is not finite', 'items');
+    }
 
     return InvoiceResult(
       subtotal: subtotal,

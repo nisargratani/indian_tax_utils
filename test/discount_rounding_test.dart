@@ -23,6 +23,35 @@ void main() {
           throwsArgumentError);
       expect(() => DiscountCalculator.fixed(amount: 100, discount: -5),
           throwsArgumentError);
+      expect(() => DiscountCalculator.fixed(amount: 100, discount: 100.01),
+          throwsArgumentError);
+    });
+
+    test('fixed accepts a full discount despite floating-point noise', () {
+      // 7 * 19.99 is 139.92999999999998, a hair below 139.93.
+      final net = DiscountCalculator.fixed(amount: 7 * 19.99, discount: 139.93);
+      expect(net, 0);
+      expect(net.isNegative, isFalse);
+      expect(DiscountCalculator.fixed(amount: 3 * 0.7, discount: 2.1), 0);
+      expect(DiscountCalculator.fixed(amount: 3 * 1.15, discount: 3.45), 0);
+    });
+
+    test('percentage rejects a result that is not finite', () {
+      expect(
+        () => DiscountCalculator.percentage(amount: 1e307, percent: 50),
+        throwsA(isA<ArgumentError>()
+            .having((e) => e.name, 'name', 'amount')
+            .having((e) => e.message, 'message', contains('not finite'))),
+      );
+    });
+
+    test('never returns negative zero', () {
+      final discount = DiscountCalculator.percentage(amount: -100, percent: 0);
+      expect(discount, 0);
+      expect(discount.isNegative, isFalse);
+      expect('$discount', isNot(contains('-0.0')));
+      final net = DiscountCalculator.fixed(amount: -0.0, discount: 0);
+      expect(net.isNegative, isFalse);
     });
   });
 
@@ -76,6 +105,12 @@ void main() {
     test('large values are rounded without losing digits', () {
       expect(RoundingHelper.roundTo(123456789012.345), 123456789012.35);
       expect(RoundingHelper.roundToNearest(1e16 + 2), 1e16 + 2);
+    });
+
+    test('very large values do not overflow to infinity', () {
+      expect(RoundingHelper.roundTo(1e307), 1e307);
+      expect(RoundingHelper.roundTo(double.maxFinite), double.maxFinite);
+      expect(RoundingHelper.roundTo(-1e307, decimals: 15), -1e307);
     });
   });
 }

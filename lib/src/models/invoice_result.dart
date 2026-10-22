@@ -29,9 +29,14 @@ class InvoiceResult {
     required this.roundedTotal,
   });
 
-  /// The "round off" line printed on invoices: `roundedTotal - total`,
+  /// The "round off" line printed on invoices: [roundedTotal] minus [total]
   /// rounded to paise. Positive when the total was rounded up.
-  double get roundOff => roundHalfAwayFromZero(roundedTotal - total, 2);
+  ///
+  /// It is taken from the total as printed, so an invoice whose amounts are
+  /// printed rounded to paise foots: for example, 50.30 at 5% prints tax
+  /// 2.52 (2.515) and round off 0.18, and `50.30 + 2.52 + 0.18 == 53`.
+  double get roundOff =>
+      roundHalfAwayFromZero(roundedTotal - roundHalfAwayFromZero(total, 2), 2);
 
   @override
   bool operator ==(Object other) =>

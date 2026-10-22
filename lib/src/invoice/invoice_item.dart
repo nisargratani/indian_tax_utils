@@ -32,13 +32,15 @@ class InvoiceItem {
   });
 
   /// `quantity * unitPrice`, before discount and tax.
-  double get subtotal => quantity * unitPrice;
+  double get subtotal =>
+      // Adding 0.0 (here and in taxAmount) turns -0.0 into 0.0.
+      quantity * unitPrice + 0.0;
 
   /// [subtotal] minus [discount]: the value GST is charged on.
   double get taxableAmount => subtotal - discount;
 
   /// GST on [taxableAmount] at [taxRate].
-  double get taxAmount => taxableAmount * taxRate / 100;
+  double get taxAmount => taxableAmount * taxRate / 100 + 0.0;
 
   /// [taxableAmount] plus [taxAmount].
   double get total => taxableAmount + taxAmount;

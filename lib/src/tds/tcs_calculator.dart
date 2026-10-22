@@ -19,8 +19,9 @@ abstract final class TcsCalculator {
   ///
   /// The result is not rounded.
   ///
-  /// Throws an [ArgumentError] if [amount] is not finite or [rate] is not
-  /// between 0 and 100.
+  /// Throws an [ArgumentError] if [amount] is not finite, if [rate] is not
+  /// between 0 and 100, or if the result is not finite (an [amount] so large
+  /// that the calculation overflows).
   static TdsResult calculate({
     required double amount,
     required double rate,
@@ -28,11 +29,15 @@ abstract final class TcsCalculator {
     checkFinite(amount, 'amount');
     checkRate(rate, 'rate', max: 100);
 
-    final tcs = amount * rate / 100;
+    // Adding 0.0 turns -0.0 (e.g. -100 at 0%) into 0.0.
+    final tcs = amount * rate / 100 + 0.0;
+    final netAmount = amount + tcs + 0.0;
+    checkResult(tcs, amount, 'amount');
+    checkResult(netAmount, amount, 'amount');
 
     return TdsResult(
       tds: tcs,
-      netAmount: amount + tcs,
+      netAmount: netAmount,
     );
   }
 }
