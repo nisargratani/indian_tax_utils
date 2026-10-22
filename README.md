@@ -34,7 +34,7 @@ Or add it to `pubspec.yaml` yourself:
 
 ```yaml
 dependencies:
-  indian_tax_utils: ^0.0.3
+  indian_tax_utils: ^0.0.4
 ```
 
 ## Quick start
@@ -132,6 +132,10 @@ final bill = InvoiceCalculator.fromItems([
 Each `InvoiceItem` also exposes `subtotal`, `taxableAmount`, `taxAmount` and
 `total` for printing line details.
 
+`roundOff` is `roundedTotal` minus the total rounded to paise, so an invoice
+printed with paise-rounded amounts foots. For example, 50.30 at 5% prints tax
+2.52 (2.515) and round off 0.18, and 50.30 + 2.52 + 0.18 = 53.
+
 ### TDS and TCS
 
 ```dart
@@ -221,6 +225,11 @@ argument, instead of silently returning `NaN`, `Infinity` or a negative tax:
 - negative tax rates (TDS/TCS rates and discount percentages must also be
   at most 100)
 - discounts that are negative or larger than the amount they apply to
+  (an excess of floating-point noise is ignored, so a discount of 139.93 on
+  `7 × 19.99`, which is `139.92999999999998`, is a full discount)
+- amounts so large that a result would not be finite, such as
+  `GstCalculator.calculate(amount: 1e307, rate: 18, intraState: false)`,
+  where `amount * rate` overflows
 
 ```dart
 try {

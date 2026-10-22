@@ -74,6 +74,34 @@ void main() {
         throwsArgumentError,
       );
     });
+
+    test('rejects a result that is not finite', () {
+      // amount * rate overflows although the tax itself would be finite.
+      expect(
+        () =>
+            GstCalculator.calculate(amount: 1e307, rate: 18, intraState: false),
+        throwsA(isA<ArgumentError>()
+            .having((e) => e.name, 'name', 'amount')
+            .having((e) => e.message, 'message', contains('not finite'))),
+      );
+      expect(
+        () =>
+            GstCalculator.calculate(amount: 1e307, rate: 18, intraState: true),
+        throwsArgumentError,
+      );
+    });
+
+    test('never returns negative zero', () {
+      // A credit note on a nil-rated supply.
+      for (final intraState in [true, false]) {
+        final r = GstCalculator.calculate(
+            amount: -100, rate: 0, intraState: intraState);
+        for (final v in [r.cgst, r.sgst, r.igst, r.totalTax]) {
+          expect(v.isNegative, isFalse);
+        }
+        expect(r.toString(), isNot(contains('-0.0')));
+      }
+    });
   });
 
   group('GstInclusiveCalculator', () {
@@ -132,6 +160,19 @@ void main() {
         () => GstSplit.split(totalTax: double.nan, intraState: true),
         throwsArgumentError,
       );
+    });
+
+    test('never returns negative zero', () {
+      for (final intraState in [true, false]) {
+        final r = GstSplit.split(totalTax: -0.0, intraState: intraState);
+        for (final v in [r.cgst, r.sgst, r.igst, r.totalTax]) {
+          expect(v.isNegative, isFalse);
+        }
+        expect(r.toString(), isNot(contains('-0.0')));
+      }
+      // Halving the smallest negative double underflows to -0.0.
+      final tiny = GstSplit.split(totalTax: -5e-324, intraState: true);
+      expect(tiny.cgst.isNegative, isFalse);
     });
   });
 

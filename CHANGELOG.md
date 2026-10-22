@@ -1,3 +1,46 @@
+## 0.0.4
+
+### Bug fixes
+
+- `InvoiceResult.roundOff` is now `roundedTotal` minus the total rounded to
+  paise. An invoice printed with paise-rounded amounts now foots. Before,
+  a half paisa could be rounded up twice, once in the printed tax and again
+  in the round off. For example, `calculate(subtotal: 50.30, gstRate: 5)`
+  gave a round off of 0.19, so 50.30 + 2.52 + 0.19 = 53.01 against a
+  rounded total of 53. It now gives 0.18.
+- A flat discount equal to the line value is no longer rejected because of
+  floating-point noise. For example, `InvoiceItem(quantity: 7,
+  unitPrice: 19.99, discount: 139.93)` threw because `7 * 19.99` is
+  `139.92999999999998`. Excesses within a relative 1e-14 are ignored, so a
+  discount of 100.01 on 100 is still rejected. This applies to
+  `InvoiceCalculator.calculate`, `InvoiceCalculator.fromItems` and
+  `DiscountCalculator.fixed`. For such a discount, `fixed` returns `0.0`.
+- Calculators throw an `ArgumentError` instead of returning `Infinity` or
+  `NaN` when a finite input overflows. Examples are
+  `GstCalculator.calculate(amount: 1e307, rate: 18, intraState: false)` and
+  an `InvoiceItem` with `quantity: 1e200, unitPrice: 1e200`. The error names
+  `amount`, `subtotal`, `items[i].quantity` or, when only the sum of the
+  lines overflows, `items`. This applies to `GstCalculator`,
+  `InvoiceCalculator`, `TdsCalculator`, `TcsCalculator` and
+  `DiscountCalculator.percentage`.
+- `RoundingHelper.roundTo` no longer returns `Infinity` for values above
+  about 1.8e306. Values from 2^52 upwards, which are already whole numbers,
+  are returned unchanged.
+- Calculators no longer return negative zero, for example on a credit note
+  for a nil-rated supply: `GstCalculator.calculate(amount: -100, rate: 0,
+  intraState: true)` printed `cgst: -0.0`. This applies to
+  `GstCalculator`, `GstSplit`, `InvoiceCalculator`, `InvoiceItem`,
+  `TdsCalculator`, `TcsCalculator` and `DiscountCalculator`. Equality and
+  `hashCode` are unaffected.
+
+### Other
+
+- `TdsCalculator.calculate` docs no longer say section 288B requires TDS to
+  be rounded to the nearest rupee. They now say to round as your compliance
+  process requires.
+- The README documents the new `ArgumentError` cases and what `roundOff`
+  is.
+
 ## 0.0.3
 
 This release contains **breaking changes**. See "Migrating from 0.0.2" in

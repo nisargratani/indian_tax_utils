@@ -27,6 +27,23 @@ void main() {
       expect(() => TdsCalculator.calculate(amount: double.nan, rate: 10),
           throwsArgumentError);
     });
+
+    test('rejects a result that is not finite', () {
+      expect(
+        () => TdsCalculator.calculate(amount: 1e307, rate: 18),
+        throwsA(isA<ArgumentError>()
+            .having((e) => e.name, 'name', 'amount')
+            .having((e) => e.message, 'message', contains('not finite'))),
+      );
+    });
+
+    test('never returns negative zero', () {
+      final r = TdsCalculator.calculate(amount: -100, rate: 0);
+      expect(r.tds.isNegative, isFalse);
+      expect(r.toString(), isNot(contains('-0.0')));
+      final zero = TdsCalculator.calculate(amount: -0.0, rate: 10);
+      expect(zero.toString(), isNot(contains('-0.0')));
+    });
   });
 
   group('TcsCalculator', () {
@@ -43,6 +60,24 @@ void main() {
     test('rejects invalid rate', () {
       expect(() => TcsCalculator.calculate(amount: 100, rate: -0.1),
           throwsArgumentError);
+    });
+
+    test('rejects a result that is not finite', () {
+      expect(
+        () => TcsCalculator.calculate(amount: 1e307, rate: 18),
+        throwsA(isA<ArgumentError>().having((e) => e.name, 'name', 'amount')),
+      );
+      // The TCS is finite, but amount + TCS is not.
+      expect(
+        () => TcsCalculator.calculate(amount: double.maxFinite, rate: 1),
+        throwsA(isA<ArgumentError>().having((e) => e.name, 'name', 'amount')),
+      );
+    });
+
+    test('never returns negative zero', () {
+      final r = TcsCalculator.calculate(amount: -100, rate: 0);
+      expect(r.tds.isNegative, isFalse);
+      expect(r.toString(), isNot(contains('-0.0')));
     });
   });
 }

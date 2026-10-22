@@ -15,20 +15,23 @@ abstract final class GstSplit {
     required bool intraState,
   }) {
     checkFinite(totalTax, 'totalTax');
+    // Adding 0.0 turns -0.0 into 0.0.
+    final tax = totalTax + 0.0;
 
     if (intraState) {
+      final half = tax / 2 + 0.0;
       return GstResult(
-        cgst: totalTax / 2,
-        sgst: totalTax / 2,
+        cgst: half,
+        sgst: half,
         igst: 0,
-        totalTax: totalTax,
+        totalTax: tax,
       );
     } else {
       return GstResult(
         cgst: 0,
         sgst: 0,
-        igst: totalTax,
-        totalTax: totalTax,
+        igst: tax,
+        totalTax: tax,
       );
     }
   }

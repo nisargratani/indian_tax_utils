@@ -37,6 +37,9 @@ double roundedUnits(double value, int decimals) {
 /// Never returns negative zero.
 double roundHalfAwayFromZero(double value, int decimals) {
   if (!value.isFinite) return value;
+  // Doubles from 2^52 upwards are whole numbers already, and scaling them
+  // could overflow to infinity.
+  if (value.abs() >= 4503599627370496) return value;
   // Adding 0.0 turns -0.0 into 0.0.
   return roundedUnits(value, decimals) / _powersOf10[decimals] + 0.0;
 }
