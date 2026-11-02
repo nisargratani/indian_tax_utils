@@ -6,8 +6,14 @@ library;
 /// These check an identifier's structure (and, optionally, a GSTIN's check
 /// digit). They do not confirm that the identifier has been issued; use the
 /// Income Tax or GST portal for that. Input is matched case-insensitively but
-/// must not contain spaces.
+/// must contain only ASCII letters and digits: spaces, and non-ASCII
+/// look-alikes such as `ı` (dotless i), are rejected.
 abstract final class TaxValidators {
+  // Checked before upper-casing: Unicode case mapping turns some non-ASCII
+  // letters into ASCII ones ('ı' -> 'I', 'ſ' -> 'S', and 'ß' -> 'SS' on the
+  // web), which the patterns below would then accept.
+  static final RegExp _asciiAlphanumeric = RegExp(r'^[0-9A-Za-z]+$');
+
   // The 4th PAN character is the holder type: A (association of persons),
   // B (body of individuals), C (company), F (firm/LLP), G (government),
   // H (HUF), J (artificial juridical person), L (local authority),
@@ -23,11 +29,17 @@ abstract final class TaxValidators {
   /// Whether [pan] has the format of a PAN: five letters, four digits and a
   /// letter, where the fourth letter is a valid holder type (`P` for an
   /// individual, `C` for a company, and so on), e.g. `ABCPE1234F`.
-  static bool isValidPan(String pan) => _pan.hasMatch(pan.toUpperCase());
+  static bool isValidPan(String pan) =>
+      _asciiAlphanumeric.hasMatch(pan) && _pan.hasMatch(pan.toUpperCase());
 
   /// Whether [gstin] has the format of a regular taxpayer's 15-character
   /// GSTIN: a 2-digit state code, a PAN (checked as by [isValidPan]), an
   /// entity number, `Z`, and a check character, e.g. `27AAPFU0939F1ZV`.
+  ///
+  /// The state code must be one that is issued: `01` to `38` (`38` is
+  /// Ladakh, `26` Dadra and Nagar Haveli and Daman and Diu), `97` (Other
+  /// Territory) or `99` (Centre Jurisdiction). Codes such as `00` or `45`
+  /// are rejected.
   ///
   /// By default only the format is checked. Set [verifyChecksum] to `true` to
   /// also verify the final check character, which catches most typing
@@ -41,14 +53,22 @@ abstract final class TaxValidators {
   /// Special registrations that do not have `Z` as the 14th character (such
   /// as TDS/TCS deductors or UN bodies) are not accepted.
   static bool isValidGstin(String gstin, {bool verifyChecksum = false}) {
+    if (!_asciiAlphanumeric.hasMatch(gstin)) return false;
     final value = gstin.toUpperCase();
     if (!_gstin.hasMatch(value)) return false;
+    if (!_isStateCode(int.parse(value.substring(0, 2)))) return false;
     return !verifyChecksum || value[14] == _gstinCheckChar(value);
   }
 
   /// Whether [tan] has the format of a TAN: four letters, five digits and a
   /// letter, e.g. `MUMA12345B`.
-  static bool isValidTan(String tan) => _tan.hasMatch(tan.toUpperCase());
+  static bool isValidTan(String tan) =>
+      _asciiAlphanumeric.hasMatch(tan) && _tan.hasMatch(tan.toUpperCase());
+
+  // GST state codes in use: 01-38 for states and union territories, 97 for
+  // Other Territory and 99 for Centre Jurisdiction.
+  static bool _isStateCode(int code) =>
+      (code >= 1 && code <= 38) || code == 97 || code == 99;
 
   // GSTN's mod-36 check character over the first 14 characters.
   static String _gstinCheckChar(String gstin) {

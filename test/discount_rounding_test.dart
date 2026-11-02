@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:indian_tax_utils/indian_tax_utils.dart';
 import 'package:test/test.dart';
 
@@ -112,5 +114,36 @@ void main() {
       expect(RoundingHelper.roundTo(double.maxFinite), double.maxFinite);
       expect(RoundingHelper.roundTo(-1e307, decimals: 15), -1e307);
     });
+  });
+
+  test('ITU-08: rounding does not round x.xx4 up for amounts near 1e12', () {
+    // In 0.0.4 the half-detection window (relative 1e-15) was ~0.096 paise
+    // wide at ₹9.6e11, so a genuine .264 was treated as .265.
+    const v = 956791942000.264;
+    expect(RoundingHelper.roundTo(v), 956791942000.26);
+    expect(RoundingHelper.roundTo(-v), -956791942000.26);
+    expect(CurrencyHelper.format(v), '₹ 9,56,79,19,42,000.26');
+    expect(
+        AmountToWords.convert(v), endsWith('Rupees and Twenty Six Paise Only'));
+    // Decimal halves and noisy values still round up.
+    expect(RoundingHelper.roundTo(956791942000.265), 956791942000.27);
+    expect(RoundingHelper.roundTo(123456789012.345), 123456789012.35);
+    expect(RoundingHelper.roundTo(1.005), 1.01);
+    expect(RoundingHelper.roundTo(2.675), 2.68);
+    expect(RoundingHelper.roundToNearest(1.005 * 100), 101);
+
+    // Seeded fuzz of 3-decimal amounts from ₹1e9 to ₹1e12 against an
+    // integer reference (thousandths stay below 2^53, so this is exact on
+    // the web too). A third are forced to be decimal halves.
+    final random = Random(8);
+    for (var i = 0; i < 20000; i++) {
+      var thousandths =
+          random.nextInt(1000000000) * 1000000 + random.nextInt(1000000);
+      if (i % 3 == 0) thousandths = thousandths ~/ 10 * 10 + 5;
+      final value = thousandths / 1000;
+      final expected = ((thousandths + 5) ~/ 10) / 100;
+      expect(RoundingHelper.roundTo(value), expected, reason: '$value');
+      expect(RoundingHelper.roundTo(-value), -expected, reason: '-$value');
+    }
   });
 }

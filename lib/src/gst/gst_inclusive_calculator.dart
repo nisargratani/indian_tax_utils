@@ -18,7 +18,9 @@ abstract final class GstInclusiveCalculator {
   /// ```
   ///
   /// To split the extracted tax into CGST/SGST or IGST, pass `r['tax']!` to
-  /// `GstSplit.split`. Results are not rounded.
+  /// `GstSplit.split`. Results are not rounded; for paise amounts that add
+  /// up, call `GstSplit.split` with `roundToPaise: true` and print
+  /// `amount - totalTax` as the taxable value.
   ///
   /// Throws an [ArgumentError] if [amount] is not finite or [rate] is negative
   /// or not finite.

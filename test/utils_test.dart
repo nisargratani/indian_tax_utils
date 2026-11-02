@@ -93,7 +93,7 @@ void main() {
 
     test('amounts below one rupee', () {
       expect(AmountToWords.convert(0.5), 'Fifty Paise Only');
-      expect(AmountToWords.convert(0.01), 'One Paise Only');
+      expect(AmountToWords.convert(0.01), 'One Paisa Only');
       expect(AmountToWords.convert(-0.5), 'Minus Fifty Paise Only');
     });
 
@@ -109,7 +109,7 @@ void main() {
     });
 
     test('rounds to the nearest paisa', () {
-      expect(AmountToWords.convert(1.005), 'One Rupee and One Paise Only');
+      expect(AmountToWords.convert(1.005), 'One Rupee and One Paisa Only');
       expect(AmountToWords.convert(10.999), 'Eleven Rupees Only');
     });
 
@@ -156,8 +156,11 @@ void main() {
           FinancialYear.isDateInFY(DateTime(2024, 4, 1), '2023-24'), isFalse);
     });
 
-    test('current matches today', () {
-      expect(FinancialYear.current(), FinancialYear.get(DateTime.now()));
+    test('current matches today in India (IST)', () {
+      final ist =
+          DateTime.now().toUtc().add(const Duration(hours: 5, minutes: 30));
+      expect(FinancialYear.current(),
+          FinancialYear.get(DateTime(ist.year, ist.month, ist.day)));
     });
   });
 
@@ -223,5 +226,93 @@ void main() {
       expect(TaxValidators.isValidTan('MUM123456B'), isFalse);
       expect(TaxValidators.isValidTan(''), isFalse);
     });
+  });
+
+  test('ITU-04: FinancialYear uses the Indian (IST) date of a UTC instant', () {
+    // 00:30 IST on 1 April 2026; DateTime.parse returns a UTC DateTime for
+    // 2026-03-31T19:00Z.
+    expect(FinancialYear.get(DateTime.parse('2026-04-01T00:30:00+05:30')),
+        '2026-27');
+    // Midnight IST on 1 April, and one second before it.
+    expect(FinancialYear.get(DateTime.utc(2026, 3, 31, 18, 30)), '2026-27');
+    expect(FinancialYear.get(DateTime.utc(2026, 3, 31, 18, 29, 59)), '2025-26');
+    expect(
+        FinancialYear.get(DateTime.parse('2026-03-31T18:30:00Z')), '2026-27');
+    expect(
+        FinancialYear.isDateInFY(
+            DateTime.parse('2026-04-01T05:00:00+05:30'), '2026-27'),
+        isTrue);
+    expect(FinancialYear.get(DateTime.utc(2026, 4, 1)), '2026-27');
+    // Year end in IST.
+    expect(FinancialYear.get(DateTime.utc(2099, 3, 31, 18, 30)), '2099-00');
+    // Local dates are calendar dates and are never shifted.
+    expect(FinancialYear.get(DateTime(2026, 3, 31, 23, 59)), '2025-26');
+    expect(FinancialYear.get(DateTime(2026, 4, 1)), '2026-27');
+  });
+
+  test('ITU-05: isValidGstin rejects state codes that are never issued', () {
+    // Check characters are correct, so verifyChecksum alone does not help.
+    for (final g in ['00AAPFU0939F1ZB', '45AAPFU0939F1ZX', '72AAPFU0939F1Z0']) {
+      expect(TaxValidators.isValidGstin(g), isFalse, reason: g);
+      expect(TaxValidators.isValidGstin(g, verifyChecksum: true), isFalse,
+          reason: g);
+    }
+    // 01 J&K, 26 DNH&DD, 27 Maharashtra, 37 Andhra Pradesh, 38 Ladakh,
+    // 97 Other Territory.
+    for (final g in [
+      '01AAPFU0939F1Z9',
+      '26AAPFU0939F1ZX',
+      '27AAPFU0939F1ZV',
+      '37AAPFU0939F1ZU',
+      '38AAPFU0939F1ZS',
+      '97AAPFU0939F1ZO',
+    ]) {
+      expect(TaxValidators.isValidGstin(g, verifyChecksum: true), isTrue,
+          reason: g);
+    }
+    // Every code: a valid one accepts exactly one check character, an
+    // invalid one accepts none.
+    const charset = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    for (var code = 0; code < 100; code++) {
+      final prefix = '${code.toString().padLeft(2, '0')}AAPFU0939F1Z';
+      final accepted = charset
+          .split('')
+          .where((c) =>
+              TaxValidators.isValidGstin('$prefix$c', verifyChecksum: true))
+          .length;
+      final valid = (code >= 1 && code <= 38) || code == 97 || code == 99;
+      expect(accepted, valid ? 1 : 0, reason: prefix);
+      expect(TaxValidators.isValidGstin('${prefix}0'), valid, reason: prefix);
+    }
+  });
+
+  test('ITU-06: AmountToWords uses singular "Paisa" for one paisa', () {
+    expect(AmountToWords.convert(0.01), 'One Paisa Only');
+    expect(AmountToWords.convert(1.01), 'One Rupee and One Paisa Only');
+    expect(AmountToWords.convert(-0.01), 'Minus One Paisa Only');
+    expect(AmountToWords.convert(0.02), 'Two Paise Only');
+    expect(AmountToWords.convert(2.21), 'Two Rupees and Twenty One Paise Only');
+  });
+
+  test('ITU-07: validators reject non-ASCII look-alike characters', () {
+    // U+0131 (dotless i) upper-cases to "I".
+    expect(TaxValidators.isValidPan('ABıPE1234F'), isFalse);
+    expect(TaxValidators.isValidTan('MUMı12345B'), isFalse);
+    expect(TaxValidators.isValidGstin('27AAıPS1234F1ZT'), isFalse);
+    expect(TaxValidators.isValidGstin('27AAıPS1234F1ZT', verifyChecksum: true),
+        isFalse);
+    // U+017F (long s) upper-cases to "S".
+    expect(TaxValidators.isValidPan('ABCPſ1234F'), isFalse);
+    // On the web 'ß'.toUpperCase() is 'SS', which made this 9-character
+    // string a valid PAN there (but not on the VM).
+    expect(TaxValidators.isValidPan('ßCPE1234F'), isFalse);
+    // Full-width digits.
+    expect(TaxValidators.isValidPan('ABCPE１２３４F'), isFalse);
+    // The ASCII originals stay valid, in either case.
+    expect(TaxValidators.isValidPan('ABIPE1234F'), isTrue);
+    expect(TaxValidators.isValidPan('abipe1234f'), isTrue);
+    expect(TaxValidators.isValidTan('MUMI12345B'), isTrue);
+    expect(TaxValidators.isValidGstin('27AAIPS1234F1ZT', verifyChecksum: true),
+        isTrue);
   });
 }
