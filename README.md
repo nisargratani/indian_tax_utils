@@ -9,10 +9,12 @@ Pure Dart with no dependencies. It works in Flutter apps on every platform
 
 ## Features
 
-- **GST**: CGST/SGST (intra-state) or IGST (inter-state) on exclusive amounts;
-  base and tax extraction from inclusive amounts; standard rate slabs
+- **GST**: CGST/SGST (intra-state) or IGST (inter-state) on exclusive amounts,
+  optionally rounded to paise so the components add up; base and tax
+  extraction from inclusive amounts; standard rate slabs
 - **Invoices**: single-rate totals or line items with mixed GST rates,
-  pre-tax discounts, rounded total and round-off
+  pre-tax discounts, optional per-line tax rounding, rounded total and
+  round-off
 - **TDS and TCS**
 - **Discounts**: percentage and flat
 - **Rounding**: to the rupee or to paise, half away from zero, safe against
@@ -34,7 +36,7 @@ Or add it to `pubspec.yaml` yourself:
 
 ```yaml
 dependencies:
-  indian_tax_utils: ^0.0.4
+  indian_tax_utils: ^0.1.0
 ```
 
 ## Quick start
@@ -81,13 +83,19 @@ final intra = GstCalculator.calculate(amount: 1000, rate: 18, intraState: true);
 final inter = GstCalculator.calculate(amount: 1000, rate: 18, intraState: false);
 // inter.igst == 180
 
-// Use the rate slabs (5%, 18%, 40%, plus legacy 12% and 28%:
-// GstRate.twelve, GstRate.twentyEight).
+// Use the rate slabs: 0%, 5%, 18%, 40% and the special 3% rate for gold,
+// silver and jewellery (GstRate.three). GstRate.twelve and
+// GstRate.twentyEight are kept for historical invoices: 12% largely moved to
+// 5% on 22 September 2025, and no goods carry 28% since 1 February 2026.
 GstCalculator.calculate(
   amount: 1000,
   rate: GstRate.five.percentage,
   intraState: true,
 );
+
+// Rates that are not whole numbers, such as 0.25% (rough precious stones)
+// and 1.5% (cut and polished diamonds), have no GstRate value: pass a double.
+GstCalculator.calculate(amount: 1000, rate: 1.5, intraState: false);
 
 // Tax-inclusive amount (e.g. an MRP): extract the base and the GST.
 final parts = GstInclusiveCalculator.extractGST(amount: 118, rate: 18);
@@ -97,6 +105,38 @@ final parts = GstInclusiveCalculator.extractGST(amount: 118, rate: 18);
 final split = GstSplit.split(totalTax: parts['tax']!, intraState: true);
 // split.cgst == 9, split.sgst == 9
 ```
+
+#### GST rounded to paise
+
+Results are not rounded by default. When you print GST on an invoice, pass
+`roundToPaise: true` so that the printed amounts add up:
+
+```dart
+GstCalculator.calculate(
+    amount: 10.25, rate: 18, intraState: true, roundToPaise: true);
+// cgst 0.92, sgst 0.92, totalTax 1.84
+GstCalculator.calculate(
+    amount: 10.25, rate: 18, intraState: false, roundToPaise: true);
+// igst 1.85, totalTax 1.85
+
+// An MRP of ₹10 inclusive of 18% GST, sold intra-state.
+final mrp = GstInclusiveCalculator.extractGST(amount: 10, rate: 18);
+final gst = GstSplit.split(
+    totalTax: mrp['tax']!, intraState: true, roundToPaise: true);
+// gst.cgst == 0.76, gst.sgst == 0.76, gst.totalTax == 1.52
+// Print the taxable value as 10 - gst.totalTax, which is 8.48.
+```
+
+CGST and SGST are separate levies at half the rate each, so each is rounded
+to paise and `totalTax` is their sum. Rounding the unrounded results
+yourself does not always add up: on 10.25 at 18%, CGST and SGST are 0.9225
+each, which print as 0.92 + 0.92 = 1.84, but the total of 1.845 prints as
+1.85.
+
+A total that is already rounded to an odd number of paise cannot be split
+into equal paise halves: `GstSplit.split(totalTax: 0.05, intraState: true,
+roundToPaise: true)` gives 0.03 + 0.03 = 0.06. Where you have the taxable
+value, use `GstCalculator.calculate` instead.
 
 ### Invoices
 
@@ -132,9 +172,26 @@ final bill = InvoiceCalculator.fromItems([
 Each `InvoiceItem` also exposes `subtotal`, `taxableAmount`, `taxAmount` and
 `total` for printing line details.
 
-`roundOff` is `roundedTotal` minus the total rounded to paise, so an invoice
-printed with paise-rounded amounts foots. For example, 50.30 at 5% prints tax
-2.52 (2.515) and round off 0.18, and 50.30 + 2.52 + 0.18 = 53.
+By default `tax` is the exact sum of the lines' `taxAmount`. If your invoice
+prints each line's tax rounded to paise, pass `roundTaxPerLine: true` so
+that the totals match the printed lines:
+
+```dart
+final pens = [
+  for (var i = 0; i < 3; i++)
+    InvoiceItem(description: 'Pen', quantity: 1, unitPrice: 10.25),
+];
+// Each line's tax is 1.845, printed as 1.85.
+InvoiceCalculator.fromItems(pens);                        // tax 5.535, total 36.285
+InvoiceCalculator.fromItems(pens, roundTaxPerLine: true); // tax 5.55, total 36.30
+```
+
+`roundedTotal` is the total rounded to paise, as printed, and then to the
+nearest rupee, half away from zero: a total of 118.4956 prints as 118.50
+and is rounded to 119. `roundOff` is `roundedTotal` minus the total rounded
+to paise, so an invoice printed with paise-rounded amounts foots. For
+example, 50.30 at 5% prints tax 2.52 (2.515) and round off 0.18, and
+50.30 + 2.52 + 0.18 = 53.
 
 ### TDS and TCS
 
@@ -165,9 +222,13 @@ RoundingHelper.roundTo(8.9991);        // 9.0  (nearest paisa)
 RoundingHelper.roundTo(1.005);         // 1.01 (not 1.00)
 ```
 
-Calculator results are **not** rounded, so you can decide where rounding
-happens (per line, per invoice, or per tax component). Rounding is half away
-from zero and corrects for binary floating-point noise.
+Calculator results are **not** rounded by default, so you can decide where
+rounding happens. Rounding each result on its own can leave a printed
+invoice that does not add up, so for GST components pass
+`roundToPaise: true` (see [GST rounded to paise](#gst-rounded-to-paise)),
+and for invoices that print tax per line pass `roundTaxPerLine: true` to
+`InvoiceCalculator.fromItems`. Rounding is half away from zero and corrects
+for binary floating-point noise.
 
 ### Currency formatting
 
@@ -183,19 +244,28 @@ CurrencyHelper.format(-1234.5);                     // -₹ 1,234.50
 ```dart
 AmountToWords.convert(123456.78);
 // One Lakh Twenty Three Thousand Four Hundred and Fifty Six Rupees and Seventy Eight Paise Only
-AmountToWords.convert(1);   // One Rupee Only
-AmountToWords.convert(0.5); // Fifty Paise Only
-AmountToWords.convert(0);   // Zero Rupees Only
+AmountToWords.convert(1);    // One Rupee Only
+AmountToWords.convert(0.5);  // Fifty Paise Only
+AmountToWords.convert(1.01); // One Rupee and One Paisa Only
+AmountToWords.convert(0);    // Zero Rupees Only
 ```
 
 ### Financial year
 
 ```dart
-FinancialYear.get(DateTime(2024, 3, 31));                 // 2023-24
-FinancialYear.get(DateTime(2024, 4, 1));                  // 2024-25
+FinancialYear.get(DateTime(2024, 3, 31));                   // 2023-24
+FinancialYear.get(DateTime(2024, 4, 1));                    // 2024-25
+FinancialYear.get(DateTime.parse('2026-03-31T19:00:00Z'));  // 2026-27
 FinancialYear.isDateInFY(DateTime(2024, 1, 15), '2023-24'); // true
-FinancialYear.current();                                  // FY for today
+FinancialYear.current();                                    // FY for today in India
 ```
+
+The financial year follows the date in India. A UTC `DateTime`, such as a
+timestamp parsed from an API with `Z` or an offset, is converted to Indian
+Standard Time (UTC+05:30) first: 2026-03-31T19:00Z is 00:30 IST on 1 April
+2026, so it is in 2026-27. A local `DateTime` is used as a calendar date
+without conversion, so a date a user picked never shifts. `current()` uses
+today's date in India, whatever the device's or server's time zone.
 
 ### Validators
 
@@ -204,6 +274,8 @@ TaxValidators.isValidPan('ABCPE1234F');      // true (case-insensitive)
 TaxValidators.isValidPan('ABCDE1234F');      // false: D is not a holder type
 TaxValidators.isValidTan('MUMA12345B');      // true
 TaxValidators.isValidGstin('27AAPFU0939F1ZV'); // true (format only)
+TaxValidators.isValidGstin('00AAPFU0939F1ZB'); // false: 00 is not a state code
+TaxValidators.isValidPan('ABıPE1234F');        // false: ı is not ASCII
 
 // Also verify the GSTIN check character to catch typing mistakes.
 TaxValidators.isValidGstin('27AAPFU0939F1ZV', verifyChecksum: true); // true
@@ -212,9 +284,12 @@ TaxValidators.isValidGstin('27AAPFU0939F1ZX', verifyChecksum: true); // false
 
 A PAN's 4th character must be a valid holder type (`P` individual, `C`
 company, `H` HUF, `F` firm/LLP, `T` trust, `A`, `B`, `G`, `J` or `L`); the
-PAN inside a GSTIN is checked the same way. Validators check structure only;
-they cannot tell you whether an identifier has actually been issued. Input must not contain spaces, so trim user input
-first.
+PAN inside a GSTIN is checked the same way. A GSTIN's state code must be one
+in use: `01` to `38`, `97` (Other Territory) or `99` (Centre Jurisdiction).
+Validators check structure only; they cannot tell you whether an identifier
+has actually been issued. Input must contain only ASCII letters and digits:
+spaces, and look-alikes such as `ı` (dotless i), are rejected, so trim user
+input first.
 
 ## Error handling
 
@@ -241,6 +316,29 @@ try {
 
 Negative amounts are allowed (for example on credit notes), as long as any
 discount is zero.
+
+## Migrating from 0.0.4
+
+0.1.0 changes some results; see the [changelog](CHANGELOG.md) for details.
+New parameters are opt-in, but these changes apply without any code change:
+
+- `InvoiceResult.roundedTotal` is rounded from the total as printed (to
+  paise). About 1 invoice in 200 changes: a total of 118.4956, printed
+  118.50, now gives 119 and a round off of 0.50 (was 118 and -0.50).
+- `FinancialYear.get` and `isDateInFY` convert UTC `DateTime`s to IST, so a
+  UTC timestamp between 00:00 and 05:30 IST on 1 April is now in the new
+  financial year. `current()` uses today's date in India. Local
+  `DateTime`s are unchanged.
+- `TaxValidators.isValidGstin` rejects state codes that are never issued
+  (`00`, `39` to `96`, and `98`).
+- `isValidPan`, `isValidGstin` and `isValidTan` reject non-ASCII input such
+  as `ABıPE1234F`, which they accepted because `ı` upper-cases to `I`.
+- `AmountToWords.convert` says `One Paisa` instead of `One Paise`.
+- `GstRate` has a new value, `three`, so an exhaustive `switch` over
+  `GstRate` needs a new case.
+- `RoundingHelper`, `CurrencyHelper` and `AmountToWords` no longer round
+  some amounts above ₹10^11 up by a paisa: `956791942000.264` now rounds to
+  `956791942000.26`.
 
 ## Migrating from 0.0.2
 

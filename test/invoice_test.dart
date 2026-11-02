@@ -364,4 +364,97 @@ void main() {
           const TdsResult(tds: 10, netAmount: 90));
     });
   });
+
+  test('ITU-01: roundedTotal rounds the paise total that is printed', () {
+    // 100.42 + 18% = 118.4956, printed 118.50, which rounds half away from
+    // zero to 119 (round off +0.50), not 118.
+    final r = InvoiceCalculator.calculate(subtotal: 100.42, gstRate: 18);
+    expect(RoundingHelper.roundTo(r.total), 118.5);
+    expect(r.roundedTotal, 119);
+    expect(r.roundOff, 0.5);
+
+    // Credit note.
+    final cn = InvoiceCalculator.calculate(subtotal: -100.42, gstRate: 18);
+    expect(cn.roundedTotal, -119);
+    expect(cn.roundOff, -0.5);
+
+    final b = InvoiceCalculator.fromItems(const [
+      InvoiceItem(description: 'x', quantity: 1, unitPrice: 100.42),
+    ]);
+    expect(b.roundedTotal, 119);
+    expect(b.roundOff, 0.5);
+
+    // Against an integer reference: the printed total in paise, rounded
+    // half away from zero to rupees.
+    final random = Random(1);
+    for (var i = 0; i < 20000; i++) {
+      final subtotal = (1 + random.nextInt(10000000)) / 100;
+      for (final gstRate in [5.0, 18.0]) {
+        for (final sign in [1, -1]) {
+          final r = InvoiceCalculator.calculate(
+              subtotal: sign * subtotal, gstRate: gstRate);
+          final printed = paise(r.total).abs();
+          final rupees = sign * ((printed + 50) ~/ 100);
+          expect(r.roundedTotal, rupees,
+              reason: '${sign * subtotal} @ $gstRate%');
+          expect(r.roundedTotal,
+              RoundingHelper.roundToNearest(RoundingHelper.roundTo(r.total)));
+        }
+      }
+    }
+  });
+
+  test('ITU-03: fromItems can round tax per line', () {
+    // Three lines of 10.25 at 18%: each prints tax 1.85 (1.845), so the
+    // printed lines add up to tax 5.55 and total 36.30.
+    final items = [
+      for (var i = 0; i < 3; i++)
+        InvoiceItem(
+            description: 'Pen $i', quantity: 1, unitPrice: 10.25, taxRate: 18),
+    ];
+    final r = InvoiceCalculator.fromItems(items, roundTaxPerLine: true);
+    expect(r.tax, 5.55);
+    expect(r.total, closeTo(36.30, 1e-9));
+    expect(r.roundedTotal, 36);
+    expect(r.roundOff, -0.3);
+
+    // The default is unchanged.
+    final exact = InvoiceCalculator.fromItems(items);
+    expect(exact.tax, closeTo(5.535, 1e-12));
+    expect(exact.total, closeTo(36.285, 1e-12));
+    expect(exact.roundOff, -0.29);
+
+    expect(
+      InvoiceCalculator.fromItems(const [], roundTaxPerLine: true),
+      const InvoiceResult(
+          subtotal: 0, discount: 0, tax: 0, total: 0, roundedTotal: 0),
+    );
+
+    // Random paise invoices with mixed rates and discounts: tax is the sum
+    // of the printed line taxes, and the printed invoice foots.
+    final random = Random(3);
+    const rates = [0.0, 3.0, 5.0, 18.0, 40.0];
+    for (var n = 0; n < 2000; n++) {
+      final count = 1 + random.nextInt(8);
+      final lines = [
+        for (var i = 0; i < count; i++)
+          InvoiceItem(
+            description: 'Line $i',
+            quantity: (1 + random.nextInt(5)).toDouble(),
+            // At least ₹1, so the discount below never exceeds the line.
+            unitPrice: (100 + random.nextInt(100000)) / 100,
+            taxRate: rates[random.nextInt(rates.length)],
+            discount: random.nextBool() ? random.nextInt(100) / 100 : 0,
+          ),
+      ];
+      final bill = InvoiceCalculator.fromItems(lines, roundTaxPerLine: true);
+      final lineTax = lines.fold(0, (s, it) => s + paise(it.taxAmount));
+      final lineTaxable = lines.fold(0, (s, it) => s + paise(it.taxableAmount));
+      expect(paise(bill.tax), lineTax);
+      expect(bill.tax, RoundingHelper.roundTo(bill.tax));
+      expect(lineTaxable + lineTax + paise(bill.roundOff),
+          paise(bill.roundedTotal),
+          reason: '$lines');
+    }
+  });
 }

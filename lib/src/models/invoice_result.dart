@@ -17,7 +17,9 @@ class InvoiceResult {
   /// The grand total: `subtotal - discount + tax`, unrounded.
   final double total;
 
-  /// [total] rounded to the nearest rupee.
+  /// The total rounded to paise (as printed), then to the nearest rupee,
+  /// half away from zero: a [total] of 118.4956, printed as 118.50, gives
+  /// 119.
   final double roundedTotal;
 
   /// Creates an [InvoiceResult].

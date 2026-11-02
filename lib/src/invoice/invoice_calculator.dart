@@ -13,7 +13,8 @@ abstract final class InvoiceCalculator {
   /// The [discount] is applied before tax, so
   /// `tax = (subtotal - discount) * gstRate / 100` and
   /// `total = subtotal - discount + tax`. The rounded total is the total
-  /// rounded to the nearest rupee.
+  /// rounded to paise, as printed, and then to the nearest rupee, so a total
+  /// of 118.4956 (printed 118.50) is rounded to 119.
   ///
   /// ```dart
   /// final r = InvoiceCalculator.calculate(subtotal: 5000, discount: 200);
@@ -40,14 +41,13 @@ abstract final class InvoiceCalculator {
     final total = taxable + tax;
     checkResult(tax, subtotal, 'subtotal');
     checkResult(total, subtotal, 'subtotal');
-    final rounded = RoundingHelper.roundToNearest(total);
 
     return InvoiceResult(
       subtotal: subtotal + 0.0,
       discount: discount + 0.0,
       tax: tax,
       total: total,
-      roundedTotal: rounded,
+      roundedTotal: _roundTotal(total),
     );
   }
 
@@ -56,7 +56,8 @@ abstract final class InvoiceCalculator {
   ///
   /// The result's `subtotal`, `discount`, `tax` and `total` are the sums of
   /// the corresponding [InvoiceItem] values; `roundedTotal` is the total
-  /// rounded to the nearest rupee. An empty list gives an all-zero result.
+  /// rounded to paise and then to the nearest rupee. An empty list gives an
+  /// all-zero result.
   ///
   /// ```dart
   /// final r = InvoiceCalculator.fromItems([
@@ -66,14 +67,21 @@ abstract final class InvoiceCalculator {
   /// // r.subtotal == 735, r.tax == 54.3, r.total == 789.3
   /// ```
   ///
-  /// Per-line tax is not rounded; round each [InvoiceItem.taxAmount] with
-  /// `RoundingHelper.roundTo` first if your invoices round tax per line.
+  /// By default per-line tax is not rounded, so `tax` is the exact sum of
+  /// the lines' [InvoiceItem.taxAmount]. If your invoice prints each line's
+  /// tax rounded to paise, set [roundTaxPerLine] to `true`: each line's tax
+  /// is then rounded to paise before it is added, so the totals match the
+  /// printed lines. For three lines of 10.25 at 18% (tax 1.845 each, printed
+  /// 1.85), `tax` is 5.55 and `total` 36.30, instead of 5.535 and 36.285.
   ///
   /// Throws an [ArgumentError] if any item has a non-finite quantity or unit
   /// price, a negative or non-finite tax rate, a discount that is negative
   /// or greater than the item's subtotal, or values so large that the item's
   /// or the invoice's totals are not finite.
-  static InvoiceResult fromItems(List<InvoiceItem> items) {
+  static InvoiceResult fromItems(
+    List<InvoiceItem> items, {
+    bool roundTaxPerLine = false,
+  }) {
     var subtotal = 0.0;
     var discount = 0.0;
     var tax = 0.0;
@@ -89,8 +97,14 @@ abstract final class InvoiceCalculator {
 
       subtotal += item.subtotal;
       discount += item.discount;
-      tax += item.taxAmount;
+      tax += roundTaxPerLine
+          ? RoundingHelper.roundTo(item.taxAmount)
+          : item.taxAmount;
     }
+
+    // The sum of paise amounts can pick up floating-point noise
+    // (0.1 + 0.2 is 0.30000000000000004), so round it back to paise.
+    if (roundTaxPerLine) tax = RoundingHelper.roundTo(tax);
 
     final total = subtotal - discount + tax;
     if (!subtotal.isFinite || !tax.isFinite || !total.isFinite) {
@@ -102,7 +116,13 @@ abstract final class InvoiceCalculator {
       discount: discount,
       tax: tax,
       total: total,
-      roundedTotal: RoundingHelper.roundToNearest(total),
+      roundedTotal: _roundTotal(total),
     );
   }
+
+  // Rounds the total as printed (to paise) and then to the nearest rupee.
+  // Rounding the unrounded total straight to the rupee would turn 118.4956,
+  // printed as 118.50, into 118 instead of 119.
+  static double _roundTotal(double total) =>
+      RoundingHelper.roundToNearest(RoundingHelper.roundTo(total));
 }

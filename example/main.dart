@@ -19,6 +19,19 @@ void main() {
   print('Base: ${CurrencyHelper.format(extracted['base']!)}');
   print('IGST: ${CurrencyHelper.format(split.igst)}');
 
+  print('\n--- GST rounded to paise ---');
+  // Rounded so that the printed CGST + SGST equal the printed total.
+  final pen = GstCalculator.calculate(
+    amount: 10.25,
+    rate: 18,
+    intraState: true,
+    roundToPaise: true,
+  );
+  print('Amount: 10.25, Rate: 18%, Intra-state: true');
+  print('CGST: ${CurrencyHelper.format(pen.cgst)}');
+  print('SGST: ${CurrencyHelper.format(pen.sgst)}');
+  print('Total Tax: ${CurrencyHelper.format(pen.totalTax)}');
+
   print('\n--- Invoice (single rate) ---');
   final invoice = InvoiceCalculator.calculate(
     subtotal: 5000,
@@ -53,6 +66,8 @@ void main() {
   print('Round off: ${CurrencyHelper.format(bill.roundOff)}');
   print('Total:     ${CurrencyHelper.format(bill.roundedTotal)}');
   print('In words:  ${AmountToWords.convert(bill.roundedTotal)}');
+  final perLine = InvoiceCalculator.fromItems(items, roundTaxPerLine: true);
+  print('GST (rounded per line): ${CurrencyHelper.format(perLine.tax)}');
 
   print('\n--- TDS / TCS ---');
   final tds = TdsCalculator.calculate(amount: 10000, rate: 10);

@@ -1,3 +1,80 @@
+## 0.1.0
+
+This release changes some results, so it is a new minor version: a
+`^0.0.4` constraint does not pick it up. See "Migrating from 0.0.4" in the
+README for the short version.
+
+### Breaking changes
+
+- **`InvoiceResult.roundedTotal` is rounded from the printed total.**
+  `InvoiceCalculator.calculate` and `fromItems` round the total to paise
+  first and then to the rupee, which is what `roundOff` already assumed.
+  For example, `calculate(subtotal: 100.42, gstRate: 18)` has a total of
+  118.4956, printed as 118.50. It gave a `roundedTotal` of 118 and a
+  `roundOff` of -0.50. It now gives 119 and 0.50. About 1 invoice in 200
+  changes.
+- **`FinancialYear` uses the date in India for UTC `DateTime`s.** A UTC
+  `DateTime` is converted to IST (UTC+05:30) before the year and month are
+  read. `get(DateTime.parse('2026-04-01T00:30:00+05:30'))` was `2025-26`
+  and is now `2026-27`. Local `DateTime`s are still used as calendar dates.
+  `current()` now uses today's date in India instead of the device's local
+  date.
+- **`TaxValidators.isValidGstin` rejects state codes that are never
+  issued.** Only `01` to `38`, `97` (Other Territory) and `99` (Centre
+  Jurisdiction) are accepted. `isValidGstin('00AAPFU0939F1ZB',
+  verifyChecksum: true)` was `true` and is now `false`.
+- **Validators reject non-ASCII characters.** `isValidPan`, `isValidGstin`
+  and `isValidTan` upper-cased the input before matching it, so non-ASCII
+  look-alikes that upper-case to ASCII letters were accepted.
+  `isValidPan('ABıPE1234F')` (dotless i) was `true` and is now `false`. On
+  the web, `isValidPan('ßCPE1234F')` was also `true`, because `ß`
+  upper-cases to `SS`. It is now `false` on every platform.
+- **`AmountToWords.convert` uses "Paisa" for one paisa.** `convert(1.01)`
+  was `One Rupee and One Paise Only` and is now
+  `One Rupee and One Paisa Only`. Other amounts still say `Paise`.
+- **`GstRate` gained a `three` value**, so an exhaustive `switch` over
+  `GstRate` needs a new case. It comes after `forty`, so existing indexes
+  are unchanged.
+
+### New
+
+- `GstCalculator.calculate` and `GstSplit.split` take `roundToPaise`
+  (default `false`). When it is `true`, CGST and SGST are each rounded to
+  paise and `totalTax` is their sum, and IGST is rounded to paise, so the
+  printed amounts add up. For example, `calculate(amount: 10.25, rate: 18,
+  intraState: true)` gives CGST and SGST of 0.9225 and a total of 1.845,
+  which print as 0.92 + 0.92 against 1.85. With `roundToPaise: true` it
+  gives 0.92 + 0.92 = 1.84.
+- `InvoiceCalculator.fromItems` takes `roundTaxPerLine` (default `false`).
+  When it is `true`, each line's tax is rounded to paise before it is
+  added, so the totals match the printed lines. For example, three lines of
+  10.25 at 18% gave a tax of 5.535 and a total of 36.285. With
+  `roundTaxPerLine: true` they give 5.55 and 36.30.
+- `GstRate.three`: the 3% rate for gold, silver and jewellery.
+
+### Bug fixes
+
+- `RoundingHelper`, `CurrencyHelper.format` and `AmountToWords.convert` no
+  longer round some amounts above ₹10^11 up by a paisa. The window that
+  treats a value within floating-point noise of a half as that half grew
+  with the amount. It is now capped at a hundredth of the unit being
+  rounded. For example, `RoundingHelper.roundTo(956791942000.264)` was
+  `956791942000.27` and is now `956791942000.26`. Decimal halves such as
+  `1.005` still round up.
+
+### Other
+
+- The README no longer suggests rounding CGST, SGST and the total each on
+  its own, which does not always add up. It recommends `roundToPaise` and
+  `roundTaxPerLine` instead. The `fromItems` docs no longer tell you to
+  round line taxes yourself.
+- `GstRate` docs: no goods carry 28% since 1 February 2026 (tobacco and pan
+  masala moved to 40%), and 12% largely moved to 5% on 22 September 2025.
+  Both values are kept for historical invoices. Rates that are not whole
+  numbers, such as 0.25% and 1.5%, are passed to the calculators as
+  doubles.
+- `FinancialYear` and `TaxValidators` docs describe the new behaviour.
+
 ## 0.0.4
 
 ### Bug fixes

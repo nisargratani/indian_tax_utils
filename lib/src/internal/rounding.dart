@@ -1,6 +1,8 @@
 /// Floating-point-safe rounding shared by the helpers. Not exported.
 library;
 
+import 'dart:math' show min;
+
 const List<double> _powersOf10 = [
   1e0, 1e1, 1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8, 1e9, 1e10, //
   1e11, 1e12, 1e13, 1e14, 1e15, 1e16, 1e17, 1e18, 1e19, 1e20,
@@ -13,9 +15,11 @@ const List<double> _powersOf10 = [
 /// such as `1.005` is stored as `1.00499999...`, and `1.005 * 100` evaluates
 /// to `100.49999999999999`. A scaled value within a relative 1e-15 (a few
 /// units in the last place) of an exact half is therefore treated as that
-/// half, so decimal halves round the way people expect. From 1e14 upwards
-/// that window would span a large part of the unit being rounded, so such
-/// values are rounded as-is.
+/// half, so decimal halves round the way people expect. The window is capped
+/// at 0.01 units, because from 1e13 upwards a relative 1e-15 would be wide
+/// enough to treat genuine values as halves: `956791942000.264` is 0.1 paise
+/// below a half and must round down. From 1e14 upwards values are rounded
+/// as-is.
 ///
 /// NaN and infinities are returned unchanged.
 double roundedUnits(double value, int decimals) {
@@ -26,7 +30,7 @@ double roundedUnits(double value, int decimals) {
 
   final floor = magnitude.floorToDouble();
   final distanceFromHalf = (magnitude - floor - 0.5).abs();
-  final rounded = distanceFromHalf <= magnitude * 1e-15
+  final rounded = distanceFromHalf <= min(magnitude * 1e-15, 0.01)
       ? floor + 1
       : magnitude.roundToDouble();
   return scaled < 0 ? -rounded : rounded;

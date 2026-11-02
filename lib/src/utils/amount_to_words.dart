@@ -31,6 +31,7 @@ abstract final class AmountToWords {
   /// // and Seventy Eight Paise Only
   /// AmountToWords.convert(1);    // One Rupee Only
   /// AmountToWords.convert(0.5);  // Fifty Paise Only
+  /// AmountToWords.convert(1.01); // One Rupee and One Paisa Only
   /// AmountToWords.convert(-10);  // Minus Ten Rupees Only
   /// AmountToWords.convert(0);    // Zero Rupees Only
   /// ```
@@ -63,7 +64,8 @@ abstract final class AmountToWords {
       if (rupees > 0)
         '${_convertToWords(rupees)} ${rupees == 1 ? 'Rupee' : 'Rupees'}',
       if (rupees > 0 && paise > 0) 'and',
-      if (paise > 0) '${_convertToWords(paise)} Paise',
+      if (paise > 0)
+        '${_convertToWords(paise)} ${paise == 1 ? 'Paisa' : 'Paise'}',
       'Only',
     ];
     return parts.join(' ');
